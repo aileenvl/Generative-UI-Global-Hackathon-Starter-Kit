@@ -1,21 +1,13 @@
 import { serve } from "@hono/node-server";
 import {
   CopilotRuntime,
-  CopilotKitIntelligence,
   createCopilotEndpoint,
 } from "@copilotkit/runtime/v2";
 import { LangGraphAgent } from "@copilotkit/runtime/langgraph";
 
-const intelligence = new CopilotKitIntelligence({
-  apiKey:
-    process.env.INTELLIGENCE_API_KEY ?? "cpk_sPRVSEED_seed0privat0longtoken00",
-  apiUrl: process.env.INTELLIGENCE_API_URL ?? "http://localhost:4203",
-  wsUrl: process.env.INTELLIGENCE_GATEWAY_WS_URL ?? "ws://localhost:4403",
-});
-
 const agent = new LangGraphAgent({
   deploymentUrl:
-    process.env.LANGGRAPH_DEPLOYMENT_URL ?? "http://localhost:8123",
+    process.env.LANGGRAPH_DEPLOYMENT_URL ?? "http://localhost:8133",
   graphId: "default",
   langsmithApiKey: process.env.LANGSMITH_API_KEY ?? "",
   // 60 (vs LangGraph default 25) leaves headroom for the deepagents planner
@@ -28,9 +20,6 @@ const agent = new LangGraphAgent({
 const app = createCopilotEndpoint({
   basePath: "/api/copilotkit",
   runtime: new CopilotRuntime({
-    intelligence,
-    identifyUser: () => ({ id: "default", name: "Hackathon User" }),
-    licenseToken: process.env.COPILOTKIT_LICENSE_TOKEN,
     agents: { default: agent },
     openGenerativeUI: true,
     a2ui: { injectA2UITool: false },
@@ -38,8 +27,8 @@ const app = createCopilotEndpoint({
       servers: [
         {
           type: "http",
-          url: process.env.MCP_SERVER_URL || "http://localhost:3001/mcp",
-          serverId: "manufact_local",
+          url: process.env.MCP_SERVER_URL || "http://localhost:3011/mcp",
+          serverId: "nutrimex_local",
         },
       ],
     },
