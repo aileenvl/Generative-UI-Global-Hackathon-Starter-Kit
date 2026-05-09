@@ -21,8 +21,10 @@
     "install:agent": "cd apps/agent && uv sync",
     "install:mcp": "npm install --workspace mcp",
     "postinstall": "npm run install:agent || true",
-    "build": "npm run build --workspace frontend",
-    "start": "npm run start --workspace frontend",
+    "build": "npm run build --workspace mcp",
+    "start": "npm run start --workspace mcp",
+    "build:ui": "npm run build --workspace frontend",
+    "start:ui": "npm run start --workspace frontend",
     "lint": "npm run lint --workspace frontend"
   },
   "devDependencies": {
