@@ -11,6 +11,7 @@ pnpm-lock.yaml
 yarn.lock
 bun.lockb
 .env
+.env.
 .env.local
 postgres-data
 redis-data
