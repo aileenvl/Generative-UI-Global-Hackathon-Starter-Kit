@@ -1,20 +1,28 @@
-import { MCPServer, text, widget } from "mcp-use/server";
+import { MCPServer, text, widget, error, object } from "mcp-use/server";
 import { z } from "zod";
 import {
-  leadSchema,
-  segmentSchema,
-  type Lead,
-  type Segment,
-} from "./src/lib/leads/types";
-import { topWorkshop } from "./src/lib/leads/derive";
-import { SAMPLE_LEADS, SAMPLE_SEGMENTS } from "./src/lib/leads/sample";
+  weeklyDietSchema,
+  ticketComparisonSchema,
+  nutritionSummarySchema,
+  shoppingCartSchema,
+  STORES,
+  HEALTH_GOALS,
+} from "./src/lib/nutrition/types";
+import {
+  SAMPLE_DIET,
+  SAMPLE_TICKET,
+  SAMPLE_CART,
+  SAMPLE_SUMMARY,
+  COFEPRIS_DB,
+} from "./src/lib/nutrition/sample";
+import { cheapestStore, goalLabel, savingsAmount } from "./src/lib/nutrition/derive";
 
 const server = new MCPServer({
-  name: "hackathon-mcp",
-  title: "hackathon-mcp",
+  name: "nutrimex-mcp",
+  title: "NutriMex",
   version: "1.0.0",
   description:
-    "Workshop Lead Triage — visual MCP widgets for the Notion-sourced workshop leads canvas: list, demand, pipeline, dashboard (stats + donut + bars), and a HITL email-draft card.",
+    "Asistente nutricional para el control de diabetes y obesidad en México. Genera planes de dieta semanales, compara precios en tiendas de conveniencia y verifica el estado COFEPRIS de los productos.",
   baseUrl: process.env.MCP_URL || "http://localhost:3011",
   favicon: "favicon.ico",
   websiteUrl: "https://mcp-use.com",
@@ -27,214 +35,273 @@ const server = new MCPServer({
   ],
 });
 
-// Shared input schema. All three tools accept an optional `leads` array (and
-// `segments`, where applicable). When omitted or empty, the widget falls back
-// to the sample dataset baked into `src/lib/leads/sample.ts` so the views can
-// be demoed inside ChatGPT/Claude without a backing fetch.
-const leadsInput = z.object({
-  leads: z
-    .array(leadSchema)
-    .default([])
-    .describe(
-      "Lead rows. Omit or pass an empty array to render with the sample dataset.",
-    ),
-  segments: z
-    .array(segmentSchema)
-    .default([])
-    .describe("Optional segments for colored dots."),
-});
-
-function pickLeads(input: { leads: Lead[] }): Lead[] {
-  return input.leads.length ? input.leads : SAMPLE_LEADS;
-}
-
-function pickSegments(input: { segments: Segment[] }): Segment[] {
-  return input.segments.length ? input.segments : SAMPLE_SEGMENTS;
-}
-
-function summarize(leads: Lead[], view: string): string {
-  const top = topWorkshop(leads);
-  const tail = top ? ` Top demand: ${top}.` : "";
-  return `Rendered the ${view} view for ${leads.length} leads.${tail}`;
-}
+// ─── Tool 1: Weekly Diet Plan ──────────────────────────────────────────────
 
 server.tool(
   {
-    name: "show-lead-list",
+    name: "show-weekly-diet",
     description:
-      "Render the workshop lead triage *list* view (KPI tiles + table of leads).",
-    schema: leadsInput,
-    widget: {
-      name: "lead-list",
-      invoking: "Loading leads…",
-      invoked: "List ready",
-    },
-  },
-  async (input) => {
-    const leads = pickLeads(input);
-    const segments = pickSegments(input);
-    return widget({
-      props: { leads, segments },
-      output: text(summarize(leads, "list")),
-    });
-  },
-);
-
-server.tool(
-  {
-    name: "show-lead-demand",
-    description:
-      "Render the workshop lead triage *demand* view (workshop bars, technical-level donut, tool usage).",
-    schema: leadsInput.pick({ leads: true }),
-    widget: {
-      name: "lead-demand",
-      invoking: "Aggregating leads…",
-      invoked: "Demand ready",
-    },
-  },
-  async (input) => {
-    const leads = pickLeads(input);
-    return widget({
-      props: { leads },
-      output: text(summarize(leads, "demand")),
-    });
-  },
-);
-
-server.tool(
-  {
-    name: "show-lead-pipeline",
-    description:
-      "Render the workshop lead triage *pipeline* view (kanban columns by status, read-only).",
-    schema: leadsInput,
-    widget: {
-      name: "lead-pipeline",
-      invoking: "Loading pipeline…",
-      invoked: "Pipeline ready",
-    },
-  },
-  async (input) => {
-    const leads = pickLeads(input);
-    const segments = pickSegments(input);
-    return widget({
-      props: { leads, segments },
-      output: text(summarize(leads, "pipeline")),
-    });
-  },
-);
-
-server.tool(
-  {
-    name: "show-canvas-dashboard",
-    description:
-      "Render the Workshop Lead Triage canvas dashboard: 4 quick-stat tiles + status donut + workshop-demand bars. Mirrors the layout above the kanban in the Next.js canvas.",
-    schema: leadsInput.pick({ leads: true }),
-    widget: {
-      name: "canvas-dashboard",
-      invoking: "Aggregating leads…",
-      invoked: "Dashboard ready",
-    },
-  },
-  async (input) => {
-    const leads = pickLeads(input);
-    return widget({
-      props: { leads },
-      output: text(summarize(leads, "dashboard")),
-    });
-  },
-);
-
-// Sample draft used when the inspector calls show-email-draft with no
-// arguments. Mirrors the SAMPLE_LEADS fallback the other widgets use so the
-// widget renders cleanly out of the box.
-const SAMPLE_DRAFT = {
-  leadId: "sample-ada-lovelace",
-  leadName: "Ada Lovelace",
-  leadEmail: "ada.lovelace@example.com",
-  leadCompany: "Mango Labs",
-  leadRole: "Founder",
-  subject: "Following up on your Agentic UI workshop interest",
-  body:
-    "Hi Ada,\n\n" +
-    "Thanks for signing up for the Agentic UI (AG-UI) workshop — your background at Mango Labs is exactly the profile we're building the curriculum for.\n\n" +
-    "A quick question before we lock the date: are there one or two specific patterns (state sync, tool gating, HITL) you're hoping we cover?\n\n" +
-    "Best,\nWorkshop team",
-};
-
-server.tool(
-  {
-    name: "show-email-draft",
-    description:
-      "Render a human-in-the-loop email draft for a single lead. Subject and body are editable in place; clicking Send calls post-email-comment to persist the message as a Notion comment. Defaults to a sample draft when called with no arguments.",
+      "Muestra el plan de alimentación semanal personalizado para el control de diabetes u obesidad. Incluye desayuno, comida, cena y colaciones con macronutrimentos, índice glucémico y etiquetas nutricionales por día.",
     schema: z.object({
-      leadId: z
+      goal: z
+        .enum(HEALTH_GOALS)
+        .optional()
+        .describe("Objetivo de salud del usuario. Omitir para usar datos de muestra."),
+      location: z
         .string()
-        .default(SAMPLE_DRAFT.leadId)
-        .describe("Notion page id of the lead to email."),
-      leadName: z.string().default(SAMPLE_DRAFT.leadName).optional(),
-      leadEmail: z.string().default(SAMPLE_DRAFT.leadEmail).optional(),
-      leadCompany: z.string().default(SAMPLE_DRAFT.leadCompany).optional(),
-      leadRole: z.string().default(SAMPLE_DRAFT.leadRole).optional(),
-      subject: z
-        .string()
-        .default(SAMPLE_DRAFT.subject)
-        .describe("Initial subject line — user may edit before sending."),
-      body: z
-        .string()
-        .default(SAMPLE_DRAFT.body)
-        .describe("Initial email body — user may edit before sending."),
+        .optional()
+        .describe("Ciudad del usuario, ej: 'Ciudad de México', 'Monterrey'."),
     }),
     widget: {
-      name: "email-draft",
-      invoking: "Drafting email…",
-      invoked: "Draft ready",
+      name: "weekly-diet",
+      invoking: "Generando plan semanal…",
+      invoked: "Plan listo",
     },
   },
-  async (input) => {
-    const props = {
-      ...SAMPLE_DRAFT,
-      ...input,
+  async ({ goal, location }) => {
+    const diet = {
+      ...SAMPLE_DIET,
+      goal: goal ?? SAMPLE_DIET.goal,
+      location: location ?? SAMPLE_DIET.location,
     };
+
     return widget({
-      props,
+      props: { diet },
       output: text(
-        `Drafted an email to ${props.leadName ?? props.leadEmail ?? props.leadId}: ${props.subject}`,
+        `Plan semanal generado para ${goalLabel(diet.goal)} en ${diet.location}. ` +
+        `Promedio: ${diet.avgCalories} kcal/día · ${diet.days.length} días planificados.`,
       ),
     });
   },
 );
 
+// ─── Tool 2: Ticket Comparison ─────────────────────────────────────────────
+
 server.tool(
   {
-    name: "post-email-comment",
+    name: "show-ticket-comparison",
     description:
-      "Post an APPROVED email draft as a comment on the lead's Notion page. Called by the email-draft widget when the user clicks Send. Returns a confirmation message. Defaults to the sample draft when called with no arguments.",
+      "Compara el costo total de la canasta de alimentos de la dieta en OXXO, 7-Eleven, Walmart Express y Soriana. Resalta el precio más barato por producto y el total más económico por tienda. Incluye estado COFEPRIS de cada producto.",
     schema: z.object({
-      leadId: z
+      location: z
         .string()
-        .default(SAMPLE_DRAFT.leadId)
-        .describe("Notion page id of the lead."),
-      subject: z
-        .string()
-        .default(SAMPLE_DRAFT.subject)
-        .describe("Final subject line, after the user's edits."),
-      body: z
-        .string()
-        .default(SAMPLE_DRAFT.body)
-        .describe("Final email body, after the user's edits."),
+        .optional()
+        .describe("Ciudad o colonia, ej: 'CDMX', 'Guadalajara'."),
+      store: z
+        .enum(STORES)
+        .optional()
+        .describe("Pre-seleccionar una tienda en el comparador."),
     }),
+    widget: {
+      name: "ticket-comparison",
+      invoking: "Consultando precios en tiendas…",
+      invoked: "Precios comparados",
+    },
   },
-  async ({ leadId, subject, body: _body }) => {
-    // Mock-only in this MCP demo. The same shape ships in the Next.js
-    // canvas's post_lead_comment LangChain tool, which posts to Notion via
-    // @notionhq/notion-mcp-server. Wire that server here when running
-    // against a live workspace.
+  async ({ location, store }) => {
+    const ticket = {
+      ...SAMPLE_TICKET,
+      location: location ?? SAMPLE_TICKET.location,
+      recommendedStore: store ?? SAMPLE_TICKET.recommendedStore,
+    };
+
+    const cheapest = cheapestStore(ticket);
+    const savings = savingsAmount(ticket);
+    const cheapestTotal = ticket.storeTotals.find((s) => s.store === cheapest)?.total ?? 0;
+
+    return widget({
+      props: { ticket },
+      output: text(
+        `Comparación de ${ticket.products.length} productos en ${ticket.stores.length} tiendas. ` +
+        `Mejor opción: ${cheapest} con $${cheapestTotal} MXN. ` +
+        `Ahorro potencial: $${savings} MXN vs. la tienda más cara.`,
+      ),
+    });
+  },
+);
+
+// ─── Tool 3: Nutrition Chart ───────────────────────────────────────────────
+
+server.tool(
+  {
+    name: "show-nutrition-chart",
+    description:
+      "Muestra gráficas del análisis nutricional semanal: distribución de macronutrimentos (proteína, carbohidratos, grasa), calorías por día vs. meta, puntuación de salud (0–100), fibra, sodio y azúcar promedio.",
+    schema: z.object({
+      goal: z
+        .enum(HEALTH_GOALS)
+        .optional()
+        .describe("Objetivo de salud para contextualizar las gráficas."),
+      targetCalories: z
+        .number()
+        .optional()
+        .describe("Calorías objetivo por día para mostrar la línea de referencia."),
+    }),
+    widget: {
+      name: "nutrition-chart",
+      invoking: "Calculando análisis nutricional…",
+      invoked: "Gráficas listas",
+    },
+  },
+  async ({ goal, targetCalories }) => {
+    const summary = {
+      ...SAMPLE_SUMMARY,
+      goal: goal ?? SAMPLE_SUMMARY.goal,
+      targetCalories: targetCalories ?? SAMPLE_SUMMARY.targetCalories,
+    };
+
+    return widget({
+      props: { summary },
+      output: text(
+        `Análisis nutricional para ${goalLabel(summary.goal)}. ` +
+        `Score de salud: ${summary.healthScore}/100. ` +
+        `Macros prom/día — Proteína: ${summary.avgMacros.protein}g, ` +
+        `Carbs: ${summary.avgMacros.carbs}g, Grasa: ${summary.avgMacros.fat}g, ` +
+        `Fibra: ${summary.avgMacros.fiber}g.`,
+      ),
+    });
+  },
+);
+
+// ─── Tool 4: Shopping Cart ─────────────────────────────────────────────────
+
+server.tool(
+  {
+    name: "show-shopping-cart",
+    description:
+      "Muestra el ticket de compra optimizado: lista de productos con cantidades, precios, estado COFEPRIS y total en la tienda más económica. Incluye advertencias sanitarias si algún producto tiene sellos de la NOM-051.",
+    schema: z.object({
+      store: z
+        .enum(STORES)
+        .optional()
+        .describe("Tienda donde se realizará la compra. Si se omite, usa la más económica de la comparativa."),
+      week: z
+        .string()
+        .optional()
+        .describe("Semana de la compra, ej: '12–18 Mayo 2025'."),
+    }),
+    widget: {
+      name: "shopping-cart",
+      invoking: "Armando ticket de compra…",
+      invoked: "Ticket listo",
+    },
+  },
+  async ({ store, week }) => {
+    const cart = {
+      ...SAMPLE_CART,
+      store: store ?? SAMPLE_CART.store,
+      week: week ?? SAMPLE_CART.week,
+    };
+
+    const alertCount = cart.items.filter((i) => i.product.cofeprisStatus === "alert").length;
+    const warningCount = cart.items.filter((i) => i.product.cofeprisStatus === "warning").length;
+    const cofeprisNote = alertCount > 0 || warningCount > 0
+      ? ` ⚠️ ${alertCount + warningCount} producto(s) con advertencias COFEPRIS.`
+      : " ✅ Todos los productos tienen estado COFEPRIS aprobado.";
+
+    return widget({
+      props: { cart },
+      output: text(
+        `Ticket de ${cart.items.length} productos en ${cart.store} · Total: $${cart.subtotal} MXN.` +
+        (cart.savingsVsMax ? ` Ahorro: $${cart.savingsVsMax} MXN.` : "") +
+        cofeprisNote,
+      ),
+    });
+  },
+);
+
+// ─── Tool 5: COFEPRIS Check ────────────────────────────────────────────────
+
+server.tool(
+  {
+    name: "check-cofepris",
+    description:
+      "Verifica el estado sanitario de un producto alimenticio en la base de datos de COFEPRIS (Comisión Federal para la Protección contra Riesgos Sanitarios de México). Retorna sellos de advertencia, nivel de alerta y recomendaciones para personas con diabetes u obesidad.",
+    schema: z.object({
+      product: z
+        .string()
+        .describe("Nombre del producto a verificar, ej: 'Coca-Cola', 'Avena Quaker', 'Gansito'."),
+    }),
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  async ({ product }) => {
+    const key = product.toLowerCase().trim();
+    const found = Object.entries(COFEPRIS_DB).find(([k]) => key.includes(k) || k.includes(key));
+
+    if (!found) {
+      return text(
+        `COFEPRIS — "${product}"\n` +
+        `❓ Sin datos en la base de consulta.\n` +
+        `Recomendación: Verificar el etiquetado físico del producto según NOM-051-SCFI/SSA1-2010. ` +
+        `Productos sin sellos de advertencia son preferibles para personas con diabetes u obesidad.`,
+      );
+    }
+
+    const [, info] = found;
+    const emoji = info.status === "approved" ? "✅" : info.status === "warning" ? "⚠️" : "🔴";
+    const statusLabel = info.status === "approved" ? "APROBADO" : info.status === "warning" ? "ADVERTENCIA" : "ALERTA SANITARIA";
+
     return text(
-      `Posted email comment on lead ${leadId}: "${subject}"`,
+      `COFEPRIS — "${product}"\n` +
+      `${emoji} ${statusLabel}\n\n` +
+      `${info.note}\n\n` +
+      `Referencia: NOM-051-SCFI/SSA1-2010 (Etiquetado frontal de alimentos y bebidas).`,
+    );
+  },
+);
+
+// ─── Tool 6: Find Healthy Options ─────────────────────────────────────────
+
+server.tool(
+  {
+    name: "find-healthy-options",
+    description:
+      "Encuentra las opciones más saludables y económicas disponibles en tiendas de conveniencia cercanas según el objetivo de salud del usuario. Devuelve un resumen con productos recomendados, tienda sugerida y presupuesto estimado semanal.",
+    schema: z.object({
+      goal: z
+        .enum(HEALTH_GOALS)
+        .describe("Objetivo de salud: control_diabetes, perder_peso, mejorar_nutricion, mantener_peso."),
+      location: z
+        .string()
+        .optional()
+        .describe("Ciudad o zona, ej: 'Colonia Doctores, CDMX'."),
+      budget: z
+        .number()
+        .optional()
+        .describe("Presupuesto semanal disponible en pesos mexicanos (MXN)."),
+    }),
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  async ({ goal, location, budget }) => {
+    const cheapest = cheapestStore(SAMPLE_TICKET);
+    const cheapestTotal = SAMPLE_TICKET.storeTotals.find((s) => s.store === cheapest)?.total ?? 0;
+    const withinBudget = budget ? cheapestTotal <= budget : true;
+    const goalName = goalLabel(goal);
+
+    const recommendations: Record<typeof HEALTH_GOALS[number], string[]> = {
+      control_diabetes: ["Nopal fresco", "Avena sin azúcar", "Frijoles negros", "Pechuga de pollo", "Verduras de hoja verde"],
+      perder_peso: ["Pechuga de pollo", "Verduras al vapor", "Yogur natural sin azúcar", "Frutas con bajo índice glucémico"],
+      mejorar_nutricion: ["Leguminosas (frijoles, lentejas)", "Cereales integrales", "Frutas y verduras de temporada"],
+      mantener_peso: ["Avena", "Pollo o pescado", "Verduras", "Frutas", "Lácteos sin azúcar"],
+    };
+
+    const products = recommendations[goal].join(", ");
+
+    return text(
+      `Opciones saludables para ${goalName} — ${location ?? "México"}\n\n` +
+      `Productos recomendados: ${products}.\n\n` +
+      `🏬 Tienda más económica: ${cheapest} · $${cheapestTotal} MXN/semana.\n` +
+      (budget
+        ? withinBudget
+          ? `✅ Dentro de tu presupuesto de $${budget} MXN (sobran $${budget - cheapestTotal}).`
+          : `⚠️ El presupuesto de $${budget} MXN es ajustado. Considera priorizar proteínas y verduras.`
+        : "") +
+      `\n\n💡 Usa "show-ticket-comparison" para ver los precios detallados por tienda, ` +
+      `"show-weekly-diet" para el plan completo y "show-shopping-cart" para armar el ticket de compra.`,
     );
   },
 );
 
 server.listen().then(() => {
-  console.log("MCP server running on port 3011");
+  console.log("NutriMex MCP server running on port 3011");
 });

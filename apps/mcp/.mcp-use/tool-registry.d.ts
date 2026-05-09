@@ -1,31 +1,31 @@
 // Auto-generated tool registry types - DO NOT EDIT MANUALLY
 // This file is regenerated whenever tools are added, removed, or updated during development
-// Generated at: 2026-05-09T07:17:40.480Z
+// Generated at: 2026-05-09T22:48:43.768Z
 
 declare module "mcp-use/react" {
   interface ToolRegistry {
-    "post-email-comment": {
-      input: { "leadId": string; "subject": string; "body": string };
+    "check-cofepris": {
+      input: { "product": string };
       output: Record<string, unknown>;
     };
-    "show-canvas-dashboard": {
-      input: { "leads": Array<{ "id": string; "name": string; "email": string; "company": string; "role": string; "workshop": string; "technical_level": string; "tools": Array<string>; "status": string; "opt_in": boolean }> };
+    "find-healthy-options": {
+      input: { "goal": "control_diabetes" | "perder_peso" | "mejorar_nutricion" | "mantener_peso"; "location"?: string | undefined; "budget"?: number | undefined };
       output: Record<string, unknown>;
     };
-    "show-email-draft": {
-      input: { "leadId": string; "leadName"?: string | undefined; "leadEmail"?: string | undefined; "leadCompany"?: string | undefined; "leadRole"?: string | undefined; "subject": string; "body": string };
+    "show-nutrition-chart": {
+      input: { "goal"?: "control_diabetes" | "perder_peso" | "mejorar_nutricion" | "mantener_peso" | undefined; "targetCalories"?: number | undefined };
       output: Record<string, unknown>;
     };
-    "show-lead-demand": {
-      input: { "leads": Array<{ "id": string; "name": string; "email": string; "company": string; "role": string; "workshop": string; "technical_level": string; "tools": Array<string>; "status": string; "opt_in": boolean }> };
+    "show-shopping-cart": {
+      input: { "store"?: "OXXO" | "7-Eleven" | "Walmart Express" | "Soriana" | undefined; "week"?: string | undefined };
       output: Record<string, unknown>;
     };
-    "show-lead-list": {
-      input: { "leads": Array<{ "id": string; "name": string; "email": string; "company": string; "role": string; "workshop": string; "technical_level": string; "tools": Array<string>; "status": string; "opt_in": boolean }>; "segments": Array<{ "id": string; "name": string; "color"?: "indigo" | "emerald" | "amber" | "rose" | "sky" | "violet" | "slate" | undefined; "leadIds": Array<string> }> };
+    "show-ticket-comparison": {
+      input: { "location"?: string | undefined; "store"?: "OXXO" | "7-Eleven" | "Walmart Express" | "Soriana" | undefined };
       output: Record<string, unknown>;
     };
-    "show-lead-pipeline": {
-      input: { "leads": Array<{ "id": string; "name": string; "email": string; "company": string; "role": string; "workshop": string; "technical_level": string; "tools": Array<string>; "status": string; "opt_in": boolean }>; "segments": Array<{ "id": string; "name": string; "color"?: "indigo" | "emerald" | "amber" | "rose" | "sky" | "violet" | "slate" | undefined; "leadIds": Array<string> }> };
+    "show-weekly-diet": {
+      input: { "goal"?: "control_diabetes" | "perder_peso" | "mejorar_nutricion" | "mantener_peso" | undefined; "location"?: string | undefined };
       output: Record<string, unknown>;
     };
   }
