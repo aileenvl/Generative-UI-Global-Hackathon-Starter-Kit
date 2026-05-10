@@ -23,8 +23,8 @@
   "scripts": {
     "build": "mcp-use build --no-typecheck",
     "dev": "MCP_PORT=3011 mcp-use dev --port 3011",
-    "start": "MCP_PORT=3011 mcp-use start --port 3011",
-    "deploy": "mcp-use deploy --port 3011",
+    "start": "mcp-use start",
+    "deploy": "mcp-use deploy",
     "postinstall": "mcp-use generate-types || true"
   },
   "dependencies": {
